@@ -830,7 +830,7 @@ section[id] {
 .menu-nav a > span {
   width: 26px;
   flex: none;
-  color: var(--red-bright);
+  color: var(--cream-deep);
   font-family: var(--body);
   font-size: 1rem;
   font-weight: 600;
@@ -2916,7 +2916,7 @@ input[type="checkbox"]:checked + .service-mark::after {
 
 .footer-invite a:hover,
 .footer-top-link:hover {
-  color: var(--red-bright);
+  color: var(--cream-deep);
 }
 
 @media (min-width: 800px) {
@@ -3183,7 +3183,7 @@ body.menu-aperto .thumb-cta {
 }
 
 .error-actions .text-link:hover {
-  color: var(--red-bright);
+  color: var(--cream-deep);
 }
 
 .error-footer {
@@ -3223,7 +3223,7 @@ body.menu-aperto .thumb-cta {
 }
 
 .error-footer a:hover {
-  color: var(--red-bright);
+  color: var(--cream-deep);
 }
 
 @media (min-width: 600px) {
