@@ -10,6 +10,11 @@
   var pole = document.querySelector(".pole-progress");
   var thumbCta = document.querySelector(".thumb-cta");
   var hero = document.querySelector(".hero");
+  var poleStripes = document.querySelector(".pole-stripes");
+  var poleShade = document.querySelector(".pole-shade");
+  var stripeBands = Array.prototype.slice.call(document.querySelectorAll(".stripe-band span"));
+  var stripePeriod = 36 * Math.SQRT2;
+  var polePeakScale = 2.4;
 
   function prefersReduced() {
     return reduceMotion.matches;
@@ -21,6 +26,44 @@
 
   var scrollTicking = false;
 
+  var scrollShift = 0;
+  var idleShift = 0;
+  var shopOpen = false;
+  var spinUntil = 0;
+  var spinning = false;
+  var lastFrame = 0;
+
+  function applyStripes() {
+    var shift = (scrollShift + idleShift) % stripePeriod;
+    if (poleStripes) {
+      poleStripes.style.transform = "translate3d(0, " + (-shift).toFixed(1) + "px, 0)";
+    }
+    stripeBands.forEach(function (band) {
+      band.style.transform = "translate3d(" + (-shift).toFixed(1) + "px, 0, 0)";
+    });
+  }
+
+  /* All'apertura il palo fa un giro; poi gira da solo solo a bottega aperta. */
+  function spinFrame(time) {
+    var intro = time < spinUntil;
+    if ((!intro && !shopOpen) || prefersReduced()) {
+      spinning = false;
+      return;
+    }
+    var delta = Math.min(50, time - (lastFrame || time));
+    lastFrame = time;
+    idleShift += delta * (intro ? 0.09 : 0.016);
+    applyStripes();
+    window.requestAnimationFrame(spinFrame);
+  }
+
+  function startSpin() {
+    if (spinning || prefersReduced()) return;
+    spinning = true;
+    lastFrame = 0;
+    window.requestAnimationFrame(spinFrame);
+  }
+
   function updateScrollEffects() {
     var top = window.scrollY || window.pageYOffset || 0;
     var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
@@ -30,10 +73,20 @@
       header.classList.toggle("is-scrolled", top > 8);
     }
 
-    if (pole) {
-      pole.style.setProperty("--pole-lit", (progress * 100).toFixed(2) + "%");
-      if (!prefersReduced()) {
-        pole.style.setProperty("--pole-shift", (-top * 0.36).toFixed(1) + "px");
+    if (poleShade) {
+      poleShade.style.transform = "scaleY(" + (1 - progress).toFixed(4) + ")";
+    }
+
+    if (!prefersReduced()) {
+      /* Le strisce si ripetono ogni 50,9px: il modulo le fa girare per sempre. */
+      scrollShift = top * 0.36;
+      applyStripes();
+
+      /* Palo grande nella prima schermata, poi si stringe e diventa barra. */
+      if (pole && hero) {
+        var leaving = Math.min(1, top / Math.max(1, hero.offsetHeight * 0.7));
+        var scale = 1 + (polePeakScale - 1) * (1 - leaving);
+        pole.style.transform = "scaleX(" + scale.toFixed(3) + ")";
       }
     }
 
@@ -42,7 +95,8 @@
       var hideForMenu = body.classList.contains("menu-aperto");
       var hideForTarget =
         body.classList.contains("prenota-in-vista") ||
-        body.classList.contains("chiusura-in-vista");
+        body.classList.contains("chiusura-in-vista") ||
+        body.classList.contains("footer-in-vista");
       thumbCta.classList.toggle(
         "is-visible",
         passedHero && !hideForMenu && !hideForTarget
@@ -198,11 +252,12 @@
   var totalEl = document.getElementById("totale");
   var summaryChoices = document.getElementById("riepilogo-scelte");
   var summaryTotal = document.getElementById("riepilogo-totale");
+  var thumbTotal = document.getElementById("thumb-totale");
   var servicesError = document.getElementById("errore-servizi");
   var resetButton = document.getElementById("azzera-conto");
 
   function formatPrice(value) {
-    return String(value) + " \u20AC";
+    return String(value) + " €";
   }
 
   function getSelectedServices() {
@@ -300,9 +355,14 @@
       summaryTotal.textContent = formatPrice(total);
     }
 
+    if (thumbTotal) {
+      thumbTotal.textContent = services.length ? formatPrice(total) : "vuoto";
+    }
+
     if (animate) {
       bumpElement(totalEl);
       bumpElement(summaryTotal);
+      bumpElement(thumbTotal);
     }
 
     return { services: services, total: total };
@@ -335,7 +395,7 @@
   }
 
   ["animationend", "webkitAnimationEnd"].forEach(function (eventName) {
-    [totalEl, summaryTotal].forEach(function (element) {
+    [totalEl, summaryTotal, thumbTotal].forEach(function (element) {
       if (element) {
         element.addEventListener(eventName, function () {
           element.classList.remove("is-bump");
@@ -360,11 +420,11 @@
 
   var dayNames = [
     "domenica",
-    "luned\u00EC",
-    "marted\u00EC",
-    "mercoled\u00EC",
-    "gioved\u00EC",
-    "venerd\u00EC",
+    "lunedì",
+    "martedì",
+    "mercoledì",
+    "giovedì",
+    "venerdì",
     "sabato"
   ];
 
@@ -460,6 +520,9 @@
 
     updateTodayRow(now.weekday);
 
+    shopOpen = Boolean(openRange);
+    if (shopOpen) startSpin();
+
     if (stateEl && stateWord) {
       if (openRange) {
         stateEl.setAttribute("data-state", "open");
@@ -482,13 +545,13 @@
               : next.offset === 1
                 ? "domani"
                 : dayNames[next.weekday];
-          var prefix =
-            next.offset === 0 && now.minutes < 780 && now.minutes >= 540
-              ? "Pausa pranzo. Riapre oggi alle "
-              : "Chiuso ora. Riapre " + when + " alle ";
-          nextEl.textContent = prefix + timeLabel(next.start) + ".";
+          var isLunch = next.offset === 0 && now.minutes >= 540;
+          nextEl.textContent =
+            (isLunch ? "Pausa pranzo. Riapre oggi alle " : "Riapre " + when + " alle ") +
+            timeLabel(next.start) +
+            ".";
         } else {
-          nextEl.textContent = "Chiuso ora. Riprende marted\u00EC alle 9:00.";
+          nextEl.textContent = "Riapre martedì alle 09:00.";
         }
       }
     }
@@ -575,6 +638,10 @@
     if (servicesError) servicesError.textContent = "";
   }
 
+  function setDateErrorPresent() {
+    return Boolean(dateInput && dateInput.getAttribute("aria-invalid"));
+  }
+
   function parseItalianDate(value) {
     if (!value) return null;
     var pieces = value.split("-").map(Number);
@@ -599,7 +666,7 @@
       setFieldError("campo-nome", nameInput, "Scrivi il tuo nome.");
       if (!firstInvalid) firstInvalid = nameInput;
     } else if (nameValue.length < 2) {
-      setFieldError("campo-nome", nameInput, "Il nome \u00E8 troppo corto.");
+      setFieldError("campo-nome", nameInput, "Il nome è troppo corto.");
       if (!firstInvalid) firstInvalid = nameInput;
     }
 
@@ -610,19 +677,33 @@
       setFieldError("campo-data", dateInput, "Scegli un giorno.");
       if (!firstInvalid) firstInvalid = dateInput;
     } else if (dateValue < now.dateString) {
-      setFieldError("campo-data", dateInput, "Questa data \u00E8 gi\u00E0 passata.");
+      setFieldError("campo-data", dateInput, "Questa data è già passata.");
       if (!firstInvalid) firstInvalid = dateInput;
     } else if (schedule[selectedDate.getUTCDay()].length === 0) {
       setFieldError(
         "campo-data",
         dateInput,
-        "La bottega \u00E8 chiusa quel giorno: scegli da marted\u00EC a sabato."
+        "La bottega è chiusa quel giorno: scegli da martedì a sabato."
       );
+      if (!firstInvalid) firstInvalid = dateInput;
+    }
+
+    var isToday = dateValue === now.dateString;
+    var todayRanges = isToday ? schedule[now.weekday] : [];
+    if (
+      todayRanges.length &&
+      !setDateErrorPresent() &&
+      now.minutes >= todayRanges[todayRanges.length - 1][1]
+    ) {
+      setFieldError("campo-data", dateInput, "Per oggi la bottega ha già chiuso: scegli un altro giorno.");
       if (!firstInvalid) firstInvalid = dateInput;
     }
 
     if (!slotInput || !slotInput.value) {
       setFieldError("campo-fascia", slotInput, "Scegli mattina o pomeriggio.");
+      if (!firstInvalid) firstInvalid = slotInput;
+    } else if (isToday && slotInput.value === "Mattina" && now.minutes >= 780) {
+      setFieldError("campo-fascia", slotInput, "La mattina di oggi è già passata: scegli il pomeriggio.");
       if (!firstInvalid) firstInvalid = slotInput;
     }
 
@@ -630,7 +711,7 @@
     if (!selection.length) {
       if (servicesError) {
         servicesError.textContent =
-          "Scegli almeno un servizio dal listino. Il conto si prepara l\u00EC.";
+          "Scegli almeno un servizio dal listino. Il conto si prepara lì.";
       }
       if (!firstInvalid && submitButton) firstInvalid = submitButton;
     }
@@ -651,7 +732,7 @@
     var humanDate = date ? italianDate.format(date) : "";
 
     var lines = [
-      "Ciao Mockly, questa \u00E8 una DEMO di prenotazione per Lama & Pettine (attivit\u00E0 inventata).",
+      "Ciao Mockly, questa è una DEMO di prenotazione per Lama & Pettine (attività inventata).",
       "",
       "Nome: " + nameInput.value.trim().replace(/\s+/g, " "),
       "Giorno: " + humanDate,
@@ -676,7 +757,7 @@
         now.dateString +
         " alle " +
         now.timeString +
-        " (ora di Cagliari). Nessun dato \u00E8 stato inviato automaticamente."
+        " (ora di Cagliari). Nessun dato è stato inviato automaticamente."
     );
 
     return lines.join("\n");
@@ -730,7 +811,7 @@
       submitButton.disabled = true;
       submitButton.classList.add("is-sending");
       submitButton.setAttribute("aria-busy", "true");
-      if (submitLabel) submitLabel.textContent = "Preparo il messaggio\u2026";
+      if (submitLabel) submitLabel.textContent = "Preparo il messaggio…";
 
       window.setTimeout(function () {
         var message = buildMessage(validation);
@@ -767,6 +848,7 @@
 
   var bookingSection = document.getElementById("prenota");
   var closingSection = document.getElementById("chiusura");
+  var footerSection = document.querySelector(".site-footer");
 
   if ("IntersectionObserver" in window) {
     var targetObserver = new IntersectionObserver(
@@ -778,6 +860,9 @@
           if (entry.target === closingSection) {
             body.classList.toggle("chiusura-in-vista", entry.isIntersecting);
           }
+          if (entry.target === footerSection) {
+            body.classList.toggle("footer-in-vista", entry.isIntersecting);
+          }
         });
         requestScrollUpdate();
       },
@@ -786,11 +871,16 @@
 
     if (bookingSection) targetObserver.observe(bookingSection);
     if (closingSection) targetObserver.observe(closingSection);
+    if (footerSection) targetObserver.observe(footerSection);
   }
 
   reduceMotion.addEventListener("change", function () {
-    if (prefersReduced() && pole) {
-      pole.style.setProperty("--pole-shift", "0px");
+    if (prefersReduced()) {
+      if (pole) pole.style.transform = "none";
+      if (poleStripes) poleStripes.style.transform = "none";
+      stripeBands.forEach(function (band) {
+        band.style.transform = "none";
+      });
     }
     requestScrollUpdate();
   });
@@ -801,5 +891,7 @@
 
   renderServices(false);
   updateScrollEffects();
+  spinUntil = window.performance.now() + 1400;
+  startSpin();
   window.addEventListener("load", updateScrollEffects, { once: true });
 })();
