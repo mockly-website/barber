@@ -9,7 +9,8 @@ Tutte le fotografie provengono da Pexels e sono coperte dalla
 [licenza Pexels](https://www.pexels.com/license/): uso gratuito, anche commerciale,
 senza obbligo di attribuzione. Le attribuzioni sono comunque raccolte qui.
 
-Le immagini sono state ritagliate, convertite in duotone blu/crema e ottimizzate in
+Le foto del banco e della bottega sono state ritagliate anche per togliere dal
+bordo le scritte sfocate di due prodotti. Le immagini sono state ritagliate, convertite in duotone blu/crema e ottimizzate in
 WebP con più larghezze responsive. Le modifiche non cambiano il soggetto della foto.
 
 | File usati | Fotografia originale | Autore |
